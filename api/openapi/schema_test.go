@@ -1,7 +1,9 @@
 package openapi_test
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"reflect"
 	"testing"
@@ -13,8 +15,14 @@ import (
 )
 
 type Obj struct {
-	Map  map[string]bool `json:"map" example:"{\"a\":true, \"b\": false}" doc:"Doc test"`
-	List []Sub           `json:"list" example:"[{\"string\": \"a\", \"int\": 42}, {\"string\": \"b\", \"timestamp\": \"2009-11-10T23:00:00Z\"}]"`
+	Map     map[string]bool `json:"map" example:"{\"a\":true, \"b\": false}" doc:"Doc test"`
+	List    []Sub           `json:"list" example:"[{\"string\": \"a\", \"int\": 42}, {\"string\": \"b\", \"timestamp\": \"2009-11-10T23:00:00Z\"}]"`
+	Unnamed struct {
+		String string `json:"string" example:"s"`
+	} `json:"unnamed" example:"{\"string\": \"s\"}"`
+	MapUnnamed map[string]struct {
+		String string `json:"string" example:"s"`
+	} `json:"mapUnnamed" example:"{\"a\": {\"string\": \"a\"}, \"b\": {\"string\": \"b\"}}"`
 }
 
 type Sub struct {
@@ -134,6 +142,27 @@ func TestSchema(t *testing.T) {
 	test.EqualsGo(t, "object", subSchema.Properties["raw"].Type)
 	test.EqualsGo(t, "", subSchema.Properties["raw"].Format)
 	test.EqualsJSON(t, enc.Map{"a": enc.String("b"), "c": enc.List{enc.Integer(1), enc.Integer(2), enc.Integer(3)}}, subSchema.Properties["raw"].Example)
+
+	const unnamedString = "struct { String string \"json:\\\"string\\\" example:\\\"s\\\"\" }"
+	unnamedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(unnamedString)))
+	unnamedSchema := s.Components.Schemas[unnamedHash]
+	test.NotNil(t, unnamedSchema)
+	test.EqualsGo(t, "object", unnamedSchema.Type)
+	test.EqualsGo(t, "", unnamedSchema.Format)
+	test.EqualsJSON(t, nil, unnamedSchema.Example)
+	test.NotNil(t, unnamedSchema.Properties["string"])
+	test.EqualsGo(t, "string", unnamedSchema.Properties["string"].Type)
+	test.EqualsJSON(t, "s", unnamedSchema.Properties["string"].Example)
+	test.NotNil(t, objSchema.Properties["unnamed"])
+	test.EqualsGo(t, "#/components/schemas/"+unnamedHash, objSchema.Properties["unnamed"].AllOf[0].Reference)
+	test.EqualsJSON(t, enc.Map{"string": enc.String("s")}, objSchema.Properties["unnamed"].Example)
+	test.NotNil(t, objSchema.Properties["mapUnnamed"])
+	test.EqualsGo(t, "object", objSchema.Properties["mapUnnamed"].Type)
+	test.EqualsGo(t, "#/components/schemas/"+unnamedHash, objSchema.Properties["mapUnnamed"].AdditionalProps.AllOf[0].Reference)
+	test.EqualsJSON(t, enc.Map{
+		"a": enc.Map{"string": enc.String("a")},
+		"b": enc.Map{"string": enc.String("b")}},
+		objSchema.Properties["mapUnnamed"].Example)
 
 	test.NotNil(t, s.Components.SecurityScheme)
 	test.NotNil(t, s.Components.SecurityScheme["jwt"])

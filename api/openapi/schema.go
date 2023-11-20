@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -183,8 +184,16 @@ func (this *Service) schemaFromType(c ctx.C, t reflect.Type, doc, example string
 
 	case reflect.Struct:
 		// Create reference
-		structKey := tt.PkgPath() + "/" + tt.Name()
-		structKey = strings.ReplaceAll(structKey, "/", "_")
+		var structKey string
+		unnamed := false
+		if tt.PkgPath() == "" || tt.Name() == "" {
+			// Using hash for unnamed structs
+			structKey = fmt.Sprintf("%x", sha256.Sum256([]byte(tt.String())))
+			unnamed = true
+		} else {
+			structKey = tt.PkgPath() + "/" + tt.Name()
+			structKey = strings.ReplaceAll(structKey, "/", "_")
+		}
 		schema := &Schema{Reference: "#/components/schemas/" + structKey}
 
 		// Add definition if not exists (the same struct type should only be defined once)
@@ -194,8 +203,10 @@ func (this *Service) schemaFromType(c ctx.C, t reflect.Type, doc, example string
 		if _, exists := this.Components.Schemas[structKey]; !exists {
 			structSchema := &Schema{
 				Type:       "object",
-				Format:     t.String(),
 				Properties: map[string]*Schema{},
+			}
+			if !unnamed {
+				structSchema.Format = t.String()
 			}
 			this.Components.Schemas[structKey] = structSchema // adding it before recursion, to protect against infinite recursion
 
