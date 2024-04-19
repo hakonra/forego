@@ -177,6 +177,8 @@ func (this Handler) Marshal(c ctx.C, in any) (Node, error) {
 	switch in := in.(type) {
 	case nil:
 		return Nil{}, nil
+	case Node:
+		return in, nil
 	case Marshaler:
 		//log.Warnf(c, "OHA: %T->MarshalNode", in)
 		return in.MarshalNode(c)
@@ -193,8 +195,6 @@ func (this Handler) Marshal(c ctx.C, in any) (Node, error) {
 			return nil, err
 		}
 		return JSON{}.Decode(c, j)
-	case Node:
-		return in, nil
 	}
 
 	v := reflect.ValueOf(in)

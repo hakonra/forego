@@ -146,6 +146,40 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
+// Marshalling Node types should be no-op
+func TestMarshalNode(t *testing.T) {
+	c := test.Context(t)
+	h := enc.Handler{
+		Debugf: log.Debugf,
+	}
+
+	x := struct {
+		A any
+		I enc.Integer
+		L enc.List
+		M enc.Map
+	}{
+		A: enc.Bool(true),
+		I: enc.Integer(42),
+		L: enc.List{enc.Time{}, enc.Nil{}},
+		M: enc.Map{"time": enc.Time{}},
+	}
+
+	n, err := h.Marshal(c, x)
+	test.NoError(t, err)
+	m, err := enc.AsMap(c, n)
+	test.NoError(t, err)
+
+	test.EqualsGo(t, x.A, m["A"])
+	test.EqualsGo(t, x.I, m["I"])
+	test.EqualsGo(t, x.L, m["L"])
+	test.EqualsGo(t, enc.Time{}, m["L"].(enc.List)[0])
+	test.EqualsGo(t, enc.Nil{}, m["L"].(enc.List)[1])
+	mm, err := enc.AsMap(c, m["M"])
+	test.NoError(t, err)
+	test.EqualsGo(t, x.M["time"], mm["time"])
+}
+
 func TestOmitEmpty(t *testing.T) {
 	c := test.Context(t)
 
