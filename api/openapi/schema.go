@@ -45,6 +45,9 @@ func (this *Service) SchemaFromType(c ctx.C, t reflect.Type, tags *reflect.Struc
 
 func (this *Service) schemaFromType(c ctx.C, t reflect.Type, doc, example string) (s *Schema, err error) {
 	defer func() {
+		if s == nil {
+			return
+		}
 		if s.Format == s.Type {
 			s.Format = ""
 		}
@@ -209,13 +212,15 @@ func (this *Service) schemaFromType(c ctx.C, t reflect.Type, doc, example string
 			var fields []string
 			for i := 0; i < tt.NumField(); i++ {
 				f := tt.Field(i)
-				s, err := this.schemaFromType(c, f.Type, f.Tag.Get("doc"), strings.TrimSpace(f.Tag.Get("example")))
-				if err != nil {
-					return structSchema, err
-				}
 				name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 				if name == "" {
 					name = f.Name
+				}
+
+				s, err := this.schemaFromType(c, f.Type, f.Tag.Get("doc"), strings.TrimSpace(f.Tag.Get("example")))
+				if err != nil {
+					delete(this.Components.Schemas, structKey)
+					return nil, ctx.NewErrorf(c, "Parsing struct field %q: %w", name, err)
 				}
 				structSchema.Properties[name] = s
 				fields = append(fields, name+" "+f.Type.String())
