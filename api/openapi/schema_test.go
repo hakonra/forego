@@ -234,3 +234,43 @@ func verifySubSchema(c ctx.C, t *testing.T, schema *openapi.Schema) {
 		props["arrAnon"].Example)
 	verifyAnonymous("arrAnon", props["arrAnon"].Items)
 }
+
+type FuncStruct1 struct {
+	F func() `json:"f" doc:"funky"`
+}
+
+type FuncStruct2 struct {
+	LF []FuncType `json:"lf" doc:"funky"`
+}
+
+type FuncStruct3 struct {
+	MF map[string]FuncType `json:"mf" doc:"funky"`
+}
+
+type FuncType = func(c ctx.C) error
+
+type FuncStruct4 struct {
+	MMF map[string]FuncStruct3 `json:"mmf"`
+}
+
+// Parsing a func should fail (but not panic)
+func TestFunc(t *testing.T) {
+	c := test.Context(t)
+	s := openapi.NewService("test-func")
+
+	for _, v := range []any{
+		func() {},
+		FuncStruct1{},
+		FuncStruct2{},
+		FuncStruct3{},
+		FuncStruct4{},
+		FuncStruct4{},
+	} {
+		rt := reflect.TypeOf(v)
+		t.Logf("Type: %+v", rt)
+		_, err := s.SchemaFromType(c, rt, nil)
+		test.Error(t, err)
+		test.Contains(t, err.Error(), "invalid")
+		test.Contains(t, err.Error(), "func")
+	}
+}
