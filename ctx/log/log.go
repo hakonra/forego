@@ -93,6 +93,12 @@ func WithHelper(c ctx.C, h func()) ctx.C {
 // Creates a slog JSON logger with a certain default configuration, with the default minimum log level of debug
 func NewDefaultSlogLogger(out io.Writer) *slog.Logger {
 	DefaultLoggerLevel.Set(slog.LevelDebug)
+	return slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{Level: DefaultLoggerLevel}))
+}
+
+// Pretty much the same as NewDefaultSlogLogger, but with a few tweaks to make it compatible with the JL viewer
+func NewJLCompatibleLogger(out io.Writer) *slog.Logger {
+	DefaultLoggerLevel.Set(slog.LevelDebug)
 	return slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{Level: DefaultLoggerLevel, ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 		switch a.Key {
 		case slog.LevelKey:
